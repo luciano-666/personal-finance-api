@@ -1,5 +1,5 @@
 # Project: Personal Finance Tracker API
-Beginner level
+Beginner level.
 REST API quản lý thu chi cá nhân. Scope nhỏ nhưng đủ để thực hành đầy đủ CRUD, auth, và deploy lần đầu.
 ## Tech stack
 - `FastAPI routing`
