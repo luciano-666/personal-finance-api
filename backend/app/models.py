@@ -72,9 +72,9 @@ class User(Base):
     transactions: Mapped[list["Transaction"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
-    # budgets: Mapped[list["Budget"]] = relationship(
-    #     back_populates="user", cascade="all, delete-orphan"
-    # )
+    budgets: Mapped[list["Budget"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email}>"
@@ -107,7 +107,7 @@ class Category(Base):
     # relationships
     user: Mapped["User"] = relationship(back_populates="categories")
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="category")
-    # budgets: Mapped[list["Budget"]] = relationship(back_populates="category")
+    budgets: Mapped[list["Budget"]] = relationship(back_populates="category")
 
     def __repr__(self) -> str:
         return f"<Category id={self.id} name={self.name} type={self.type}>"
@@ -156,3 +156,54 @@ class Transaction(Base):
 
     def __repr__(self) -> str:
         return f"<Transaction id={self.id} amount={self.amount} type={self.type}>"
+
+
+class Budget(Base):
+    __tablename__ = "budgets"
+    __table_args__ = (
+        # one budget target per category per month/year per user
+        UniqueConstraint(
+            "user_id",
+            "category_id",
+            "month",
+            "year",
+            name="uq_budget_user_category_period",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    category_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("categories.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    target_amount: Mapped[Decimal] = mapped_column(
+        Numeric(precision=15, scale=2), nullable=False
+    )
+    month: Mapped[int] = mapped_column(Integer, nullable=False)  # 1–12
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    # relationships
+    user: Mapped["User"] = relationship(back_populates="budgets")
+    category: Mapped["Category"] = relationship(back_populates="budgets")
+
+    def __repr__(self) -> str:
+        return f"<Budget id={self.id} category_id={self.category_id} {self.month}/{self.year}>"
