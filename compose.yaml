@@ -30,5 +30,18 @@ services:
     depends_on:
       - db
 
+  redis:
+    image: redis:latest
+    container_name: my-redis
+    restart: always
+    ports:
+      - 6379:6379
+    environment:
+      - REDIS_ARGS=--requirepass ${REDIS_PASSWORD?Variable not set} --appendonly yes
+    volumes:
+      - redis-data:/data
+
 volumes:
   app-db-data:
+  redis-data:
+    driver: local
