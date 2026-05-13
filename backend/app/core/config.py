@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import computed_field, PostgresDsn
+from pydantic import computed_field, PostgresDsn, EmailStr
 
 
 class Settings(BaseSettings):
@@ -26,6 +26,10 @@ class Settings(BaseSettings):
             port=self.POSTGRES_PORT,
             path=self.POSTGRES_DB,
         )
+    
+    EMAIL_TEST_USER: EmailStr = "test@example.com"
+    FIRST_SUPERUSER: EmailStr
+    FIRST_SUPERUSER_PASSWORD: str
 
 
 settings = Settings()  # type: ignore
