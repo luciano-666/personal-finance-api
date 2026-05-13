@@ -1,7 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase
+
 from sqlalchemy import select
 
+from app.core.base import Base
 from app.core.config import settings
 from app.models import User
 from app.schemas import UserCreate
@@ -14,10 +15,6 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
-
-
-class Base(DeclarativeBase):
-    pass
 
 
 async def init_db(session: AsyncSession) -> None:
