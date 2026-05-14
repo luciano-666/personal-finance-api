@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from sqlalchemy import select
 
-from app.core.base import Base
+
 from app.core.config import settings
 from app.models import User
 from app.schemas import UserCreate
