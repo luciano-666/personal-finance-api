@@ -1,6 +1,8 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import computed_field, PostgresDsn, EmailStr
 
+import secrets
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -30,6 +32,8 @@ class Settings(BaseSettings):
     EMAIL_TEST_USER: EmailStr = "test@example.com"
     FIRST_SUPERUSER: EmailStr
     FIRST_SUPERUSER_PASSWORD: str
+
+    SECRET_KEY: str = secrets.token_urlsafe(32)
 
 
 settings = Settings()  # type: ignore
