@@ -49,24 +49,14 @@ class UserRegister(BaseModel):
     timezone: str = Field(default="UTC", max_length=50)
 
 
-class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-
-
-class TokenRefresh(BaseModel):
-    refresh_token: str
-
-
-class AccessTokenResponse(BaseModel):
+class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+# Contents of JWT token
+class TokenPayload(BaseModel):
+    sub: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -85,20 +75,15 @@ class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=128)
 
 
-class UserResponse(_Base):
-    id: uuid.UUID
-    email: EmailStr
-    full_name: str | None
-    timezone: str
-    is_active: bool
-    is_superuser: bool
-    created_at: datetime
-    updated_at: datetime
-
-
 class UserUpdate(BaseModel):
     full_name: str | None = Field(default=None, max_length=100)
     timezone: str | None = Field(default=None, max_length=50)
+
+
+# Properties to return via API, id is always required
+class UserPublic(UserBase):
+    id: uuid.UUID
+    created_at: datetime | None = None
 
 
 class UserPasswordUpdate(BaseModel):
@@ -277,24 +262,3 @@ class MonthlySummaryResponse(BaseModel):
         if not 1 <= v <= 12:
             raise ValueError("month must be between 1 and 12")
         return v
-
-
-# ---------------------------------------------------------------------------
-# Generic responses
-# ---------------------------------------------------------------------------
-
-
-class MessageResponse(BaseModel):
-    """Simple acknowledgement payload."""
-
-    message: str
-
-
-class ErrorDetail(BaseModel):
-    loc: list[str | int] | None = None
-    msg: str
-    type: str
-
-
-class ErrorResponse(BaseModel):
-    detail: str | list[ErrorDetail]
