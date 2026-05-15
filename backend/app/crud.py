@@ -1,32 +1,26 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Annotated, Optional
-from fastapi import Depends
+from typing import Optional
 
-from sqlalchemy import select, func
+from sqlalchemy import select
 
-
-from app.api.deps import get_db
-from models import User
-from schemas import UserCreate
+from app.models import User
+from app.schemas import UserCreate
+from app.core.security import get_password_hash, verify_password
 
 
 async def create_user(
-    *, session: Annotated[AsyncSession, Depends(get_db)], user_create: UserCreate
+    *, session: AsyncSession, user_create: UserCreate
 ) -> Optional[User]:
-    result = await session.execute(
-        select(User).where(func.lower(User.email) == user_create.email.lower()),
-    )
-    existing_email = result.scalars().first()
-    if existing_email:
-        return None
-    db_obj = User(
-        email=user_create.email,
-        password=user_create.password,
-        is_active=user_create.is_active,
-        is_superuser=user_create.is_superuser,
-        full_name=user_create.full_name,
-    )
+    data = user_create.model_dump(exclude={"password"})
+    db_obj = User(**data, hashed_password=get_password_hash(user_create.password))
     session.add(db_obj)
     await session.commit()
     await session.refresh(db_obj)
     return db_obj
+
+
+async def get_user_by_email(*, session: AsyncSession, email: str) -> User | None:
+    statement = select(User).where(User.email == email)
+    result = await session.execute(statement)
+    session_user = result.scalars().first()
+    return session_user
