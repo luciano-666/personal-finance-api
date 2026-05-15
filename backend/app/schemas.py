@@ -42,13 +42,6 @@ class _Base(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class UserRegister(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
-    full_name: str | None = Field(default=None, max_length=100)
-    timezone: str = Field(default="UTC", max_length=50)
-
-
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -57,6 +50,16 @@ class Token(BaseModel):
 # Contents of JWT token
 class TokenPayload(BaseModel):
     sub: str | None = None
+
+
+class NewPassword(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+# Generic message
+class Message(BaseModel):
+    message: str
 
 
 # ---------------------------------------------------------------------------
@@ -86,15 +89,10 @@ class UserPublic(UserBase):
     created_at: datetime | None = None
 
 
-class UserPasswordUpdate(BaseModel):
-    current_password: str
-    new_password: str = Field(min_length=8, max_length=128)
-
-    @model_validator(mode="after")
-    def passwords_must_differ(self) -> "UserPasswordUpdate":
-        if self.current_password == self.new_password:
-            raise ValueError("New password must differ from current password.")
-        return self
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    full_name: str | None = Field(default=None, max_length=100)
 
 
 # ---------------------------------------------------------------------------

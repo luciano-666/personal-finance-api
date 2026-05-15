@@ -54,6 +54,7 @@ class Settings(BaseSettings):
         return bool(self.SMTP_HOST and self.EMAILS_FROM_EMAIL)
     
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 8
+    EMAIL_RESET_TOKEN_EXPIRE_HOURS: int = 48
 
 
 settings = Settings()  # type: ignore
