@@ -7,6 +7,7 @@ requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.18.4",
     "bcrypt>=5.0.0",
+    "emails>=1.1.1",
     "fastapi[standard]>=0.136.1",
     "psycopg[binary]>=3.3.4",
     "pwdlib[argon2,bcrypt]>=0.3.0",
