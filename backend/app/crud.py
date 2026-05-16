@@ -1,10 +1,10 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
+from typing import Optional, Any
 
 from sqlalchemy import select
 
 from app.models import User
-from app.schemas import UserCreate
+from app.schemas import UserCreate, UserUpdate
 from app.core.security import get_password_hash, verify_password
 
 
@@ -48,4 +48,17 @@ async def authenticate(
         session.add(db_user)
         await session.commit()
         await session.refresh(db_user)
+    return db_user
+
+
+async def update_user(session: AsyncSession, db_user: User, user_in: UserUpdate) -> Any:
+    user_data = user_in.model_dump(exclude_unset=True)
+    extra_data = {}
+    if "password" in user_data:
+        user_data["hashed_password"] = get_password_hash(user_data.pop("password"))
+    for field, value in user_data.items():
+        setattr(db_user, field, value)
+    session.add(db_user)
+    await session.commit()
+    await session.refresh(db_user)
     return db_user

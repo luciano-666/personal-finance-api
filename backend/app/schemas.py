@@ -78,21 +78,36 @@ class UserCreate(UserBase):
     password: str = Field(min_length=8, max_length=128)
 
 
-class UserUpdate(BaseModel):
-    full_name: str | None = Field(default=None, max_length=100)
-    timezone: str | None = Field(default=None, max_length=50)
-
-
 # Properties to return via API, id is always required
 class UserPublic(UserBase):
     id: uuid.UUID
     created_at: datetime | None = None
 
 
+class UsersPublic(BaseModel):
+    data: list[UserPublic]
+    count: int
+
+
 class UserRegister(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     full_name: str | None = Field(default=None, max_length=100)
+
+
+class UserUpdateMe(BaseModel):
+    full_name: str | None = Field(default=None, max_length=255)
+    email: EmailStr | None = Field(default=None, max_length=255)
+
+
+class UserUpdate(UserBase):
+    email: EmailStr | None = Field(default=None, max_length=255)  # type: ignore[assignment]
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+
+
+class UpdatePassword(BaseModel):
+    current_password: str = Field(min_length=8, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
 
 
 # ---------------------------------------------------------------------------
