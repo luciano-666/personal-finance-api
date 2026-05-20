@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from typing import Annotated, Any
 from datetime import timedelta
 
-from app.schemas import Token, UserPublic, Message, NewPassword
+from app.schemas import Token, UserPublic, Message, NewPassword, UserUpdate
 from app.api.deps import SessionDep, CurrentUser
 from app import crud
 from app.core.config import settings
@@ -67,24 +67,24 @@ async def recover_password(email: str, session: SessionDep) -> Message:
     )
 
 
-# @router.post("/reset-password/")
-# async def reset_password(session: SessionDep, body: NewPassword) -> Message:
-#     """
-#     Reset password
-#     """
-#     email = verify_password_reset_token(token=body.token)
-#     if not email:
-#         raise HTTPException(status_code=400, detail="Invalid token")
-#     user = await crud.get_user_by_email(session=session, email=email)
-#     if not user:
-#         # Don't reveal that the user doesn't exist - use same error as invalid token
-#         raise HTTPException(status_code=400, detail="Invalid token")
-#     elif not user.is_active:
-#         raise HTTPException(status_code=400, detail="Inactive user")
-#     user_in_update = UserUpdate(password=body.new_password)
-#     await crud.update_user(
-#         session=session,
-#         db_user=user,
-#         user_in=user_in_update,
-#     )
-#     return Message(message="Password updated successfully")
+@router.post("/reset-password/")
+async def reset_password(session: SessionDep, body: NewPassword) -> Message:
+    """
+    Reset password
+    """
+    email = verify_password_reset_token(token=body.token)
+    if not email:
+        raise HTTPException(status_code=400, detail="Invalid token")
+    user = await crud.get_user_by_email(session=session, email=email)
+    if not user:
+        # Don't reveal that the user doesn't exist - use same error as invalid token
+        raise HTTPException(status_code=400, detail="Invalid token")
+    elif not user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+    user_in_update = UserUpdate(password=body.new_password)
+    await crud.update_user(
+        session=session,
+        db_user=user,
+        user_in=user_in_update,
+    )
+    return Message(message="Password updated successfully")
