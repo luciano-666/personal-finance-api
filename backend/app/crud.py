@@ -3,9 +3,11 @@ from typing import Optional, Any
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+from sqlalchemy.exc import IntegrityError
 
 from app.models import User, Category, Transaction
-from sqlalchemy.orm import selectinload
+
 from app.core.security import get_password_hash, verify_password
 from app.schemas import (
     TransactionCreate,
@@ -250,10 +252,8 @@ async def delete_transaction(*, session: AsyncSession, tx: Transaction) -> None:
 # ---------------------------------------------------------------------------
 # Category — public CRUD
 # ---------------------------------------------------------------------------
-
-
 async def get_category(
-    *, session: AsyncSession, user_id: uuid.UUID, category_id: uuid.UUID
+    *, session: AsyncSession, category_id: uuid.UUID, user_id: uuid.UUID
 ) -> Optional[Category]:
     statement = select(Category).where(
         Category.id == category_id, Category.user_id == user_id
@@ -261,13 +261,12 @@ async def get_category(
     return (await session.execute(statement)).scalar_one_or_none()
 
 
-async def list_categories(
-    *, session: AsyncSession, user_id: uuid.UUID, type: Optional[str]
-) -> list[Category]:
-    where = [Category.user_id == user_id]
-    if type:
-        where.append(Category.type == type)
-    statement = select(Category).where(*where)
+async def list_categories(*, session: AsyncSession, user: User) -> list[Category]:
+    where = []
+    if not user.is_superuser:
+        where.append(Category.user_id == user.id)
+
+    statement = select(Category).where(*where).order_by(Category.created_at.asc())
     result = (await session.execute(statement)).scalars().all()
     return list(result)
 
@@ -285,7 +284,7 @@ async def create_category(
 
 async def update_category(
     *, session: AsyncSession, category: Category, category_update: CategoryUpdate
-) -> Any:
+) -> Category:
     category_data = category_update.model_dump(exclude_unset=True)
     for field, value in category_data.items():
         setattr(category, field, value)
@@ -295,6 +294,11 @@ async def update_category(
     return category
 
 
-async def delete_category(*, session: AsyncSession, category: Category) -> None:
-    await session.delete(category)
-    await session.commit()
+async def delete_category(*, session: AsyncSession, category: Category) -> bool:
+    try:
+        await session.delete(category)
+        await session.commit()
+        return True
+    except IntegrityError:
+        await session.rollback()
+        return False
