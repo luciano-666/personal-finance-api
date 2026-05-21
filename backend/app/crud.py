@@ -5,13 +5,16 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User, Category, Transaction
-from app.schemas import UserCreate, UserUpdate
 from sqlalchemy.orm import selectinload
 from app.core.security import get_password_hash, verify_password
 from app.schemas import (
     TransactionCreate,
     TransactionFilter,
     TransactionUpdate,
+    CategoryCreate,
+    CategoryUpdate,
+    UserCreate,
+    UserUpdate,
 )
 
 
@@ -60,7 +63,6 @@ async def authenticate(
 
 async def update_user(session: AsyncSession, db_user: User, user_in: UserUpdate) -> Any:
     user_data = user_in.model_dump(exclude_unset=True)
-    extra_data = {}
     if "password" in user_data:
         user_data["hashed_password"] = get_password_hash(user_data.pop("password"))
     for field, value in user_data.items():
@@ -242,4 +244,57 @@ async def update_transaction(
 async def delete_transaction(*, session: AsyncSession, tx: Transaction) -> None:
     """Hard-delete *tx* from the database."""
     await session.delete(tx)
+    await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Category — public CRUD
+# ---------------------------------------------------------------------------
+
+
+async def get_category(
+    *, session: AsyncSession, user_id: uuid.UUID, category_id: uuid.UUID
+) -> Optional[Category]:
+    statement = select(Category).where(
+        Category.id == category_id, Category.user_id == user_id
+    )
+    return (await session.execute(statement)).scalar_one_or_none()
+
+
+async def list_categories(
+    *, session: AsyncSession, user_id: uuid.UUID, type: Optional[str]
+) -> list[Category]:
+    where = [Category.user_id == user_id]
+    if type:
+        where.append(Category.type == type)
+    statement = select(Category).where(*where)
+    result = (await session.execute(statement)).scalars().all()
+    return list(result)
+
+
+async def create_category(
+    *, session: AsyncSession, category_create: CategoryCreate, user_id: uuid.UUID
+) -> Category:
+    data = category_create.model_dump()
+    category = Category(**data, user_id=user_id)
+    session.add(category)
+    await session.commit()
+    await session.refresh(category)
+    return category
+
+
+async def update_category(
+    *, session: AsyncSession, category: Category, category_update: CategoryUpdate
+) -> Any:
+    category_data = category_update.model_dump(exclude_unset=True)
+    for field, value in category_data.items():
+        setattr(category, field, value)
+    session.add(category)
+    await session.commit()
+    await session.refresh(category)
+    return category
+
+
+async def delete_category(*, session: AsyncSession, category: Category) -> None:
+    await session.delete(category)
     await session.commit()

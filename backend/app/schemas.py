@@ -27,17 +27,6 @@ from pydantic import (
 from app.models import CategoryType, TransactionType
 
 # ---------------------------------------------------------------------------
-# Shared config
-# ---------------------------------------------------------------------------
-
-
-class _Base(BaseModel):
-    """Common config for all response schemas."""
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-# ---------------------------------------------------------------------------
 # Auth
 # ---------------------------------------------------------------------------
 
@@ -68,7 +57,7 @@ class Message(BaseModel):
 
 
 class UserBase(BaseModel):
-    email: EmailStr
+    email: EmailStr = Field(max_length=255)
     is_active: bool = True
     full_name: str | None = Field(default=None, max_length=100)
     is_superuser: bool = False
@@ -80,6 +69,8 @@ class UserCreate(UserBase):
 
 # Properties to return via API, id is always required
 class UserPublic(UserBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     created_at: datetime | None = None
 
@@ -115,42 +106,39 @@ class UpdatePassword(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class CategoryCreate(BaseModel):
+class CategoryBase(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    type: CategoryType
+    type: str = Field(max_length=10)
     icon: str | None = Field(default=None, max_length=50)
     color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
+    is_default: bool = False
 
 
-class CategoryUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=100)
-    icon: str | None = Field(default=None, max_length=50)
-    color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
-    # type is intentionally immutable after creation
+class CategoryCreate(CategoryBase):
+    pass
 
 
-class CategoryResponse(_Base):
+class CategoryUpdate(CategoryBase):
+    name: str | None = Field(default=None, min_length=1, max_length=100)  # type: ignore
+    type: str | None = Field(max_length=10)  # type: ignore
+
+
+class CategoryPublic(CategoryBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     user_id: uuid.UUID
-    name: str
-    type: CategoryType
-    icon: str | None
-    color: str | None
-    is_default: bool
-    created_at: datetime
 
 
-class CategoryList(_Base):
-    items: list[CategoryResponse]
+class CategoriesPublic(BaseModel):
+    items: list[CategoryPublic]
     total: int
 
 
 # ---------------------------------------------------------------------------
 # Transaction
 # ---------------------------------------------------------------------------
-
-
-class TransactionCreate(BaseModel):
+class TransactionBase(BaseModel):
     category_id: uuid.UUID
     amount: Decimal = Field(gt=0, max_digits=15, decimal_places=2)
     type: TransactionType
@@ -159,33 +147,34 @@ class TransactionCreate(BaseModel):
     notes: str | None = Field(default=None, max_length=500)
 
 
-class TransactionUpdate(BaseModel):
-    category_id: uuid.UUID | None = None
-    amount: Decimal | None = Field(default=None, gt=0, max_digits=15, decimal_places=2)
-    type: TransactionType | None = None
-    description: str | None = Field(default=None, min_length=1, max_length=255)
-    transaction_date: date | None = None
-    notes: str | None = Field(default=None, max_length=500)
+class TransactionCreate(TransactionBase):
+    pass
 
 
-class TransactionResponse(_Base):
+class TransactionUpdate(TransactionBase):
+    category_id: uuid.UUID | None = None  # type: ignore
+    amount: Decimal | None = Field(default=None, gt=0, max_digits=15, decimal_places=2)  # type: ignore
+    type: TransactionType | None = None  # type: ignore
+    description: str | None = Field(default=None, min_length=1, max_length=255)  # type: ignore
+    transaction_date: date | None = None  # type: ignore
+
+
+class TransactionPublic(TransactionBase):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     user_id: uuid.UUID
-    category_id: uuid.UUID
-    amount: Decimal
-    type: TransactionType
-    description: str
-    transaction_date: date
-    notes: str | None
     created_at: datetime
     updated_at: datetime
 
     # optional nested read
-    category: CategoryResponse | None = None
+    category: CategoryPublic | None = None
 
 
-class TransactionList(_Base):
-    items: list[TransactionResponse]
+class TransactionsPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    items: list[TransactionPublic]
     total: int
     page: int
     page_size: int
@@ -226,7 +215,9 @@ class BudgetUpdate(BaseModel):
     )
 
 
-class BudgetResponse(_Base):
+class BudgetResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: uuid.UUID
     user_id: uuid.UUID
     category_id: uuid.UUID
@@ -236,10 +227,12 @@ class BudgetResponse(_Base):
     created_at: datetime
     updated_at: datetime
 
-    category: CategoryResponse | None = None
+    category: CategoryPublic | None = None
 
 
-class BudgetList(_Base):
+class BudgetList(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     items: list[BudgetResponse]
     total: int
 

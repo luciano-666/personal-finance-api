@@ -10,8 +10,8 @@ from app import crud
 from app.schemas import (
     TransactionCreate,
     TransactionFilter,
-    TransactionList,
-    TransactionResponse,
+    TransactionsPublic,
+    TransactionPublic,
     TransactionUpdate,
 )
 
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 # ---------------------------------------------------------------------------
 
 
-@router.post("/", response_model=TransactionResponse, status_code=201)
+@router.post("/", response_model=TransactionPublic, status_code=201)
 async def create_transaction(
     *,
     session: SessionDep,
@@ -42,7 +42,7 @@ async def create_transaction(
     return tx
 
 
-@router.get("/", response_model=TransactionList)
+@router.get("/", response_model=TransactionsPublic)
 async def list_transactions(
     *,
     session: SessionDep,
@@ -58,8 +58,8 @@ async def list_transactions(
     items, total = await crud.list_transactions(
         session=session, user_id=current_user.id, filters=filters
     )
-    items_list = [TransactionResponse.model_validate(item) for item in items]
-    return TransactionList(
+    items_list = [TransactionPublic.model_validate(item) for item in items]
+    return TransactionsPublic(
         items=items_list,
         total=total,
         page=filters.page,
@@ -67,7 +67,7 @@ async def list_transactions(
     )
 
 
-@router.get("/{transaction_id}", response_model=TransactionResponse)
+@router.get("/{transaction_id}", response_model=TransactionPublic)
 async def read_transaction(
     transaction_id: uuid.UUID,
     session: SessionDep,
@@ -87,7 +87,7 @@ async def read_transaction(
     return tx
 
 
-@router.patch("/{transaction_id}", response_model=TransactionResponse)
+@router.patch("/{transaction_id}", response_model=TransactionPublic)
 async def update_transaction(
     *,
     transaction_id: uuid.UUID,
