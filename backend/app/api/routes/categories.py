@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from typing import Any
 import uuid
 
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/categories", tags=["categories"])
 
 @router.get("/", response_model=CategoriesPublic)
 async def read_categories(
-    session: SessionDep, current_user: CurrentUser, category_filter: CategoryFilter
+    session: SessionDep, current_user: CurrentUser, category_filter: CategoryFilter = Depends()
 ) -> Any:
     """Retrieve categories"""
     categories = await crud.list_categories(
