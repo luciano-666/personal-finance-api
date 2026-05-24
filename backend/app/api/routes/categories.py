@@ -7,6 +7,7 @@ from app.schemas import (
     CategoryPublic,
     CategoryCreate,
     CategoryUpdate,
+    CategoryFilter,
 )
 from app.api.deps import SessionDep, CurrentUser
 from app import crud
@@ -16,9 +17,13 @@ router = APIRouter(prefix="/categories", tags=["categories"])
 
 
 @router.get("/", response_model=CategoriesPublic)
-async def read_categories(session: SessionDep, current_user: CurrentUser) -> Any:
+async def read_categories(
+    session: SessionDep, current_user: CurrentUser, category_filter: CategoryFilter
+) -> Any:
     """Retrieve categories"""
-    categories = await crud.list_categories(session=session, user=current_user)
+    categories = await crud.list_categories(
+        session=session, user=current_user, filters=category_filter
+    )
     categories_public = [
         CategoryPublic.model_validate(category) for category in categories
     ]

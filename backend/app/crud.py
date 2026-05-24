@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
-from app.models import User, Category, Transaction
+from app.models import User, Category, Transaction, Budget
 
 from app.core.security import get_password_hash, verify_password
 from app.schemas import (
@@ -15,8 +15,12 @@ from app.schemas import (
     TransactionUpdate,
     CategoryCreate,
     CategoryUpdate,
+    CategoryFilter,
     UserCreate,
     UserUpdate,
+    BudgetCreate,
+    BudgetUpdate,
+    BudgetFilter,
 )
 
 
@@ -252,6 +256,8 @@ async def delete_transaction(*, session: AsyncSession, tx: Transaction) -> None:
 # ---------------------------------------------------------------------------
 # Category — public CRUD
 # ---------------------------------------------------------------------------
+
+
 async def get_category(
     *, session: AsyncSession, category_id: uuid.UUID, user_id: uuid.UUID
 ) -> Optional[Category]:
@@ -261,10 +267,14 @@ async def get_category(
     return (await session.execute(statement)).scalar_one_or_none()
 
 
-async def list_categories(*, session: AsyncSession, user: User) -> list[Category]:
+async def list_categories(
+    *, session: AsyncSession, user: User, filters: CategoryFilter
+) -> list[Category]:
     where = []
     if not user.is_superuser:
         where.append(Category.user_id == user.id)
+    if filters.type:
+        where.append(Category.type == filters.type)
 
     statement = select(Category).where(*where).order_by(Category.created_at.asc())
     result = (await session.execute(statement)).scalars().all()
@@ -302,3 +312,85 @@ async def delete_category(*, session: AsyncSession, category: Category) -> bool:
     except IntegrityError:
         await session.rollback()
         return False
+
+
+# ---------------------------------------------------------------------------
+# Budget — public CRUD
+# ---------------------------------------------------------------------------
+
+
+async def get_budget(
+    *, session: AsyncSession, budget_id: uuid.UUID, user_id: uuid.UUID
+) -> Optional[Budget]:
+    statement = (
+        select(Budget)
+        .where(Budget.id == budget_id, Budget.user_id == user_id)
+        .options(selectinload(Budget.category))
+    )
+    return (await session.execute(statement)).scalar_one_or_none()
+
+
+async def list_budgets(
+    *, session: AsyncSession, user: User, filters: BudgetFilter
+) -> list[Budget]:
+    where = []
+    if not user.is_superuser:
+        where.append(Budget.user_id == user.id)
+    if filters.month:
+        where.append(Budget.month == filters.month)
+    if filters.year:
+        where.append(Budget.year == filters.year)
+
+    statement = (
+        select(Budget)
+        .where(*where)
+        .order_by(Budget.created_at.asc())
+        .options(selectinload(Budget.category))
+    )
+    result = (await session.execute(statement)).scalars().all()
+    return list(result)
+
+
+async def create_budget(
+    *, session: AsyncSession, user_id: uuid.UUID, budget_create: BudgetCreate
+) -> Optional[Budget]:
+    category = await _get_category_for_user(
+        session=session, category_id=budget_create.category_id, user_id=user_id
+    )
+    if not category:
+        return None
+
+    existing = await session.execute(
+        select(Budget).where(
+            Budget.user_id == user_id,
+            Budget.category_id == budget_create.category_id,
+            Budget.month == budget_create.month,
+            Budget.year == budget_create.year,
+        )
+    )
+    if existing.scalar_one_or_none():
+        return None
+
+    data = budget_create.model_dump()
+    budget = Budget(**data, user_id=user_id)
+    session.add(budget)
+    await session.commit()
+    await session.refresh(budget, attribute_names=["category"])
+    return budget
+
+
+async def update_budget(
+    *, session: AsyncSession, budget: Budget, budget_in: BudgetUpdate
+) -> Budget:
+    budget_data = budget_in.model_dump(exclude_unset=True)
+    for field, value in budget_data.items():
+        setattr(budget, field, value)
+    session.add(budget)
+    await session.commit()
+    await session.refresh(budget)
+    return budget
+
+
+async def delete_budget(*, session: AsyncSession, budget: Budget) -> None:
+    await session.delete(budget)
+    await session.commit()

@@ -108,7 +108,7 @@ class UpdatePassword(BaseModel):
 
 class CategoryBase(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    type: str = Field(max_length=10)
+    type: CategoryType
     icon: str | None = Field(default=None, max_length=50)
     color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
     is_default: bool = False
@@ -120,7 +120,7 @@ class CategoryCreate(CategoryBase):
 
 class CategoryUpdate(CategoryBase):
     name: str | None = Field(default=None, min_length=1, max_length=100)  # type: ignore
-    type: str | None = Field(max_length=10)  # type: ignore
+    type: CategoryType | None  # type: ignore
 
 
 class CategoryPublic(CategoryBase):
@@ -133,6 +133,10 @@ class CategoryPublic(CategoryBase):
 class CategoriesPublic(BaseModel):
     items: list[CategoryPublic]
     total: int
+
+
+class CategoryFilter(BaseModel):
+    type: CategoryType | None
 
 
 # ---------------------------------------------------------------------------
@@ -202,11 +206,14 @@ class TransactionFilter(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class BudgetCreate(BaseModel):
-    category_id: uuid.UUID
+class BudgetBase(BaseModel):
     target_amount: Decimal = Field(gt=0, max_digits=15, decimal_places=2)
     month: int = Field(ge=1, le=12)
     year: int = Field(ge=2000, le=2100)
+
+
+class BudgetCreate(BudgetBase):
+    category_id: uuid.UUID
 
 
 class BudgetUpdate(BaseModel):
@@ -215,26 +222,29 @@ class BudgetUpdate(BaseModel):
     )
 
 
-class BudgetResponse(BaseModel):
+class BudgetPublic(BudgetBase):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     user_id: uuid.UUID
     category_id: uuid.UUID
-    target_amount: Decimal
-    month: int
-    year: int
     created_at: datetime
     updated_at: datetime
 
     category: CategoryPublic | None = None
 
 
-class BudgetList(BaseModel):
+class BudgetsPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    items: list[BudgetResponse]
+    items: list[BudgetPublic]
     total: int
+
+
+class BudgetFilter(BaseModel):
+    target_amount: Decimal | None = Field(gt=0, max_digits=15, decimal_places=2)
+    month: int | None = Field(ge=1, le=12)
+    year: int | None
 
 
 # ---------------------------------------------------------------------------
