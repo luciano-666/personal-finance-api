@@ -242,8 +242,8 @@ class BudgetsPublic(BaseModel):
 
 
 class BudgetFilter(BaseModel):
-    target_amount: Decimal | None = Field(gt=0, max_digits=15, decimal_places=2)
-    month: int | None = Field(ge=1, le=12)
+    target_amount: Decimal | None = Field(default=None, gt=0, max_digits=15, decimal_places=2)
+    month: int | None = Field(default=None, ge=1, le=12)
     year: int | None
 
 

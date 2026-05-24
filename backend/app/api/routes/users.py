@@ -85,7 +85,7 @@ async def read_users(session: SessionDep, skip: int = 0, limit: int = 100) -> An
 
     statement = select(User).order_by(User.created_at.desc()).offset(skip).limit(limit)
     result = await session.execute(statement)
-    users = result.all()
+    users = result.scalars().all()
 
     return UsersPublic(
         data=[UserPublic.model_validate(user) for user in users], count=count
@@ -109,7 +109,7 @@ async def update_user_me(
                 status_code=409, detail="User with this email already exists"
             )
     user_data = user_in.model_dump(exclude_unset=True)
-    for field, value in user_data:
+    for field, value in user_data.items():
         setattr(current_user, field, value)
     session.add(current_user)
     await session.commit()
@@ -167,7 +167,7 @@ async def read_user_by_id(
     """
     Get a specific user by id.
     """
-    user = session.get(User, user_id)
+    user = await session.get(User, user_id)
     if user == current_user:
         return user
     if not current_user.is_superuser:
