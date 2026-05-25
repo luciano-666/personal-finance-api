@@ -51,6 +51,24 @@ class Message(BaseModel):
     message: str
 
 
+class TokenWithRefresh(BaseModel):
+    """Response khi login thành công — trả kèm refresh token."""
+
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    """Tuỳ chọn: client có thể gửi kèm refresh token để revoke ngay."""
+
+    refresh_token: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # User
 # ---------------------------------------------------------------------------
@@ -242,7 +260,9 @@ class BudgetsPublic(BaseModel):
 
 
 class BudgetFilter(BaseModel):
-    target_amount: Decimal | None = Field(default=None, gt=0, max_digits=15, decimal_places=2)
+    target_amount: Decimal | None = Field(
+        default=None, gt=0, max_digits=15, decimal_places=2
+    )
     month: int | None = Field(default=None, ge=1, le=12)
     year: int | None
 

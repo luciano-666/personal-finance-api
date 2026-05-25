@@ -3,8 +3,11 @@ from pwdlib import PasswordHash
 from pwdlib.hashers.argon2 import Argon2Hasher
 from pwdlib.hashers.bcrypt import BcryptHasher
 
-from typing import Any
+from typing import Any, Tuple
 from datetime import datetime, timedelta, timezone
+
+import hashlib
+import secrets
 
 from app.core.config import settings
 
@@ -33,3 +36,18 @@ def verify_password(
 
 def get_password_hash(password: str) -> str:
     return password_hash.hash(password)
+
+
+def create_refresh_token() -> Tuple[str, str]:
+    """
+    Returns (raw_token, token_hash).
+    raw_token → gửi cho client (cookie/body).
+    token_hash → lưu vào DB.
+    """
+    raw = secrets.token_urlsafe(64)
+    token_hash = hashlib.sha256(raw.encode()).hexdigest()
+    return (raw, token_hash)
+
+
+def hash_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode()).hexdigest()
