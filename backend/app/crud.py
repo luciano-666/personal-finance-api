@@ -1,15 +1,16 @@
 import uuid
 from typing import Optional, Any
 from decimal import Decimal
+from datetime import datetime, timezone, timedelta
 
 from sqlalchemy import select, func, extract
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
-from app.models import User, Category, Transaction, Budget, CategoryType
+from app.models import User, Category, Transaction, Budget, CategoryType, RefreshToken
 
-from app.core.security import get_password_hash, verify_password
+from app.core.security import get_password_hash, verify_password, hash_token
 from app.schemas import (
     TransactionCreate,
     TransactionFilter,
@@ -498,3 +499,53 @@ async def get_monthly_summary(
         net=total_income - total_expense,
         categories=categories,
     )
+
+
+# ---------------------------------------------------------------------------
+# RefreshToken CRUD
+# ---------------------------------------------------------------------------
+
+
+async def create_refresh_token(
+    *, session: AsyncSession, user_id: uuid.UUID, token_hash: str, expires_in_days: int
+) -> RefreshToken:
+    expires_at = datetime.now(timezone.utc) + timedelta(days=expires_in_days)
+    rt = RefreshToken(user_id=user_id, token_hash=token_hash, expires_at=expires_at)
+    session.add(rt)
+    await session.commit()
+    await session.refresh(rt)
+    return rt
+
+
+async def get_refresh_token_by_hash(
+    *, session: AsyncSession, token_hash: str
+) -> RefreshToken | None:
+    stmt = select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+    return (await session.execute(stmt)).scalar_one_or_none()
+
+
+async def revoke_refresh_token(
+    *, session: AsyncSession, refresh_token: RefreshToken
+) -> None:
+    refresh_token.is_revoked = True
+    session.add(refresh_token)
+    await session.commit()
+
+
+async def revoke_all_user_refresh_tokens(
+    *, session: AsyncSession, user_id: uuid.UUID
+) -> int:
+    """Revoke tất cả refresh token của user. Trả về số lượng đã revoke."""
+    stmt = select(RefreshToken).where(
+        RefreshToken.user_id == user_id, RefreshToken.is_revoked == False
+    )
+    result = (await session.execute(stmt)).scalars().all()
+    count = 0
+    for rt in result:
+        rt.is_revoked = True
+        session.add(rt)
+        count += 1
+    await session.commit()
+    return count
+
+

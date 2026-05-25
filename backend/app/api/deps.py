@@ -4,6 +4,7 @@ from jwt.exceptions import InvalidTokenError
 from pydantic import ValidationError
 
 from typing import Annotated
+import redis.asyncio as aioredis
 
 
 from app.core.config import settings
@@ -11,6 +12,7 @@ from app.core.db import AsyncSessionLocal, AsyncSession
 from app.models import User
 from app.schemas import TokenPayload
 from app.core import security
+from app.core.redis import get_redis
 
 import jwt
 
@@ -26,6 +28,7 @@ async def get_db():
 
 SessionDep = Annotated[AsyncSession, Depends(get_db)]
 TokenDep = Annotated[str, Depends(reusable_oauth2)]
+RedisDep = Annotated[aioredis.Redis, Depends(get_redis)]
 
 
 async def get_current_user(session: SessionDep, token: TokenDep) -> User:
@@ -34,11 +37,19 @@ async def get_current_user(session: SessionDep, token: TokenDep) -> User:
             token, settings.SECRET_KEY, algorithms=[security.ALGORITHM]
         )
         token_data = TokenPayload(**payload)
-    except (InvalidTokenError, ValidationError):
+    except InvalidTokenError, ValidationError:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not validate credentials",
         )
+    # ── Kiểm tra token có bị blacklist chưa ──────────────────────────────
+    redis = await get_redis()
+    is_blacklisted = await redis.get(f"blacklist:access:{token}")
+    if is_blacklisted:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been revoked"
+        )
+    # ─────────────────────────────────────────────────────────────────────
     user = await session.get(User, token_data.sub)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
