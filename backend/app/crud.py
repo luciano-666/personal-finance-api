@@ -1,12 +1,13 @@
 import uuid
 from typing import Optional, Any
+from decimal import Decimal
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, extract
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
-from app.models import User, Category, Transaction, Budget
+from app.models import User, Category, Transaction, Budget, CategoryType
 
 from app.core.security import get_password_hash, verify_password
 from app.schemas import (
@@ -21,6 +22,8 @@ from app.schemas import (
     BudgetCreate,
     BudgetUpdate,
     BudgetFilter,
+    MonthlySummaryResponse,
+    CategorySummary,
 )
 
 
@@ -394,3 +397,104 @@ async def update_budget(
 async def delete_budget(*, session: AsyncSession, budget: Budget) -> None:
     await session.delete(budget)
     await session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Summary — public CRUD
+# ---------------------------------------------------------------------------
+
+
+async def get_monthly_summary(
+    *, session: AsyncSession, user_id: uuid.UUID, year: int, month: int
+) -> MonthlySummaryResponse:
+    """
+    Return aggregated income/expense totals and per-category breakdown
+    for a given user, year, and month.
+
+    Budget figures are left-joined — categories without a budget will
+    have budget_target=None and budget_remaining=None.
+    """
+
+    # 1. Aggregate transactions per category for the requested period
+    tx_agg = (
+        select(
+            Transaction.category_id,
+            func.sum(Transaction.amount).label("total"),
+            func.count(Transaction.id).label("transaction_count"),
+        )
+        .where(
+            Transaction.user_id == user_id,
+            extract("year", Transaction.transaction_date) == year,
+            extract("month", Transaction.transaction_date) == month,
+        )
+        .group_by(Transaction.category_id)
+        .subquery()
+    )
+
+    # 2. Left-join with budgets for the same period
+    budget_sub = (
+        select(Budget.category_id, Budget.target_amount.label("budget_target"))
+        .where(
+            Budget.user_id == user_id,
+            Budget.month == month,
+            Budget.year == year,
+        )
+        .subquery()
+    )
+
+    # 3. Join everything: tx_agg → Category → budget (left)
+    stmt = (
+        select(
+            Category.id.label("category_id"),
+            Category.name.label("category_name"),
+            Category.type.label("type"),
+            tx_agg.c.total,
+            tx_agg.c.transaction_count,
+            budget_sub.c.budget_target,
+        )
+        .join(tx_agg, Category.id == tx_agg.c.category_id)
+        .outerjoin(budget_sub, Category.id == budget_sub.c.category_id)
+        .where(Category.user_id == user_id)
+        .order_by(Category.type, tx_agg.c.total.desc())
+    )
+
+    rows = (await session.execute(stmt)).scalars().all()
+
+    # 4. Build response
+    total_income = Decimal("0")
+    total_expense = Decimal("0")
+    categories: list[CategorySummary] = []
+
+    for row in rows:
+        budget_target = row.budget_target
+        total = row.total
+
+        budget_remaining = (
+            (budget_target - total) if budget_target is not None else None
+        )
+
+        if row.type == CategoryType.income.value:
+            total_income += total
+        else:
+            total_expense += total
+
+        categories.append(
+            CategorySummary(
+                category_id=row.category_id,
+                category_name=row.category_name,
+                type=CategoryType(row.type),
+                total=total,
+                transaction_count=row.transaction_count,
+                budget_target=budget_target,
+                budget_remaining=budget_remaining,
+            )
+        )
+
+    return MonthlySummaryResponse(
+        year=year,
+        month=month,
+        total_income=total_income,
+        total_expense=total_expense,
+        net=total_income - total_expense,
+        categories=categories,
+    )
