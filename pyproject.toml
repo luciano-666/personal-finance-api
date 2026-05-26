@@ -9,6 +9,7 @@ dependencies = [
     "bcrypt>=5.0.0",
     "emails>=1.1.1",
     "fastapi[standard]>=0.136.1",
+    "httpx>=0.28.1",
     "psycopg[binary]>=3.3.4",
     "pwdlib[argon2,bcrypt]>=0.3.0",
     "pyjwt>=2.12.1",
@@ -18,3 +19,8 @@ dependencies = [
 
 [tool.fastapi]
 entrypoint = "backend.app.main:app"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]

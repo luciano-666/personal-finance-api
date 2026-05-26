@@ -28,9 +28,7 @@ from app.schemas import (
 )
 
 
-async def create_user(
-    *, session: AsyncSession, user_create: UserCreate
-) -> Optional[User]:
+async def create_user(*, session: AsyncSession, user_create: UserCreate) -> User:
     data = user_create.model_dump(exclude={"password"})
     db_obj = User(**data, hashed_password=get_password_hash(user_create.password))
     session.add(db_obj)
@@ -547,5 +545,3 @@ async def revoke_all_user_refresh_tokens(
         count += 1
     await session.commit()
     return count
-
-
