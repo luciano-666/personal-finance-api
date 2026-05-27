@@ -457,7 +457,7 @@ async def get_monthly_summary(
         .order_by(Category.type, tx_agg.c.total.desc())
     )
 
-    rows = (await session.execute(stmt)).scalars().all()
+    rows = (await session.execute(stmt)).all()
 
     # 4. Build response
     total_income = Decimal("0")

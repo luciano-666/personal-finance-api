@@ -217,7 +217,7 @@ async def delete_user(
     """
     Delete a user.
     """
-    user = session.get(User, user_id)
+    user = await session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if user == current_user:
