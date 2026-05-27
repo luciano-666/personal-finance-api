@@ -1,16 +1,15 @@
 from collections.abc import AsyncGenerator
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
-from sqlalchemy import delete
 
 from app.main import app
 from app.core.db import init_db
 from app.api.deps import get_db
-from app.models import User, Transaction, Category, Budget, Base
+from app.models import Base
 from app.core.config import settings
 
 
@@ -79,7 +78,18 @@ async def db(
 
 
 @pytest.fixture
-async def client(db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+def mock_redis():
+    """Mock Redis để tránh dependency vào Redis server trong unit test."""
+    with patch("app.api.deps.get_redis") as mock_get_redis:
+        redis_mock = AsyncMock()
+        redis_mock.get.return_value = None
+        redis_mock.setex.return_value = True
+        mock_get_redis.return_value = redis_mock
+        yield redis_mock
+
+
+@pytest.fixture
+async def client(db: AsyncSession, mock_redis) -> AsyncGenerator[AsyncClient, None]:
     async def override_get_db():
         yield db
 
@@ -94,12 +104,12 @@ async def client(db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides.clear()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 async def superuser_token_headers(client: AsyncClient) -> dict[str, str]:
     return await get_superuser_token_headers(client)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 async def normal_user_token_headers(
     client: AsyncClient, db: AsyncSession
 ) -> dict[str, str]:

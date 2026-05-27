@@ -2,12 +2,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from pwdlib.hashers.bcrypt import BcryptHasher
 
 from fastapi.encoders import jsonable_encoder
+import pytest
 
 from tests.utils.utils import random_email, random_lower_string
 from app.schemas import UserCreate, UserUpdate
 from app import crud
 from app.models import User
 from app.core.security import verify_password
+
+pytestmark = pytest.mark.anyio
 
 
 async def test_create_user(db: AsyncSession) -> None:

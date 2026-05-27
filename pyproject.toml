@@ -24,3 +24,6 @@ entrypoint = "backend.app.main:app"
 dev = [
     "pytest>=9.0.3",
 ]
+
+[tool.pytest.ini_options]
+anyio_mode = "auto"
