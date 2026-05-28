@@ -14,6 +14,7 @@ Naming convention:
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Optional
 
 from pydantic import (
     BaseModel,
@@ -109,9 +110,11 @@ class UserUpdateMe(BaseModel):
     email: EmailStr | None = Field(default=None, max_length=255)
 
 
-class UserUpdate(UserBase):
-    email: EmailStr | None = Field(default=None, max_length=255)  # type: ignore[assignment]
+class UserUpdate(BaseModel):
+    email: EmailStr | None = Field(default=None, max_length=255)
     password: str | None = Field(default=None, min_length=8, max_length=128)
+    full_name: str | None = Field(default=None, max_length=100)
+    is_superuser: bool | None = False
 
 
 class UpdatePassword(BaseModel):
@@ -136,9 +139,12 @@ class CategoryCreate(CategoryBase):
     pass
 
 
-class CategoryUpdate(CategoryBase):
-    name: str | None = Field(default=None, min_length=1, max_length=100)  # type: ignore
-    type: CategoryType | None  # type: ignore
+class CategoryUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    type: Optional[CategoryType] = None
+    icon: str | None = Field(default=None, max_length=50)
+    color: str | None = Field(default=None, pattern=r"^#[0-9A-Fa-f]{6}$")
+    is_default: bool = False
 
 
 class CategoryPublic(CategoryBase):
@@ -165,7 +171,7 @@ class TransactionBase(BaseModel):
     amount: Decimal = Field(gt=0, max_digits=15, decimal_places=2)
     type: TransactionType
     description: str = Field(min_length=1, max_length=255)
-    transaction_date: date
+    transaction_date: Optional[date]
     notes: str | None = Field(default=None, max_length=500)
 
 
@@ -173,12 +179,12 @@ class TransactionCreate(TransactionBase):
     pass
 
 
-class TransactionUpdate(TransactionBase):
-    category_id: uuid.UUID | None = None  # type: ignore
-    amount: Decimal | None = Field(default=None, gt=0, max_digits=15, decimal_places=2)  # type: ignore
-    type: TransactionType | None = None  # type: ignore
-    description: str | None = Field(default=None, min_length=1, max_length=255)  # type: ignore
-    transaction_date: date | None = None  # type: ignore
+class TransactionUpdate(BaseModel):
+    category_id: uuid.UUID | None = None
+    amount: Decimal | None = Field(default=None, gt=0, max_digits=15, decimal_places=2)
+    type: TransactionType | None = None
+    description: str | None = Field(default=None, min_length=1, max_length=255)
+    transaction_date: date | None = None
 
 
 class TransactionPublic(TransactionBase):

@@ -71,12 +71,6 @@ async def db(
             await conn.close()
 
 
-# @pytest.fixture(scope="module")
-# async def client() -> AsyncGenerator[TestClient, None]:
-#     with TestClient(app) as c:
-#         yield c
-
-
 @pytest.fixture
 def mock_redis():
     """Mock Redis để tránh dependency vào Redis server trong unit test."""

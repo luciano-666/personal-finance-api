@@ -270,12 +270,12 @@ async def get_category(
 
 
 async def list_categories(
-    *, session: AsyncSession, user: User, filters: CategoryFilter
+    *, session: AsyncSession, user: User, filters: Optional[CategoryFilter]
 ) -> list[Category]:
     where = []
     if not user.is_superuser:
         where.append(Category.user_id == user.id)
-    if filters.type:
+    if filters and filters.type:
         where.append(Category.type == filters.type)
 
     statement = select(Category).where(*where).order_by(Category.created_at.asc())
