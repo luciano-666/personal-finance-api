@@ -160,7 +160,7 @@ class CategoriesPublic(BaseModel):
 
 
 class CategoryFilter(BaseModel):
-    type: CategoryType | None
+    type: CategoryType | None = None
 
 
 # ---------------------------------------------------------------------------
