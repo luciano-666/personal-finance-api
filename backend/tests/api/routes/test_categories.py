@@ -424,7 +424,132 @@ async def test_delete_category_superuser_can_delete_others(
     assert r.status_code == 204
 
 
-# async def test_delete_category_unauthorized(client: AsyncClient) -> None:
-#     """Trả về 401 nếu không có token."""
-#     r = await client.delete(f"{BASE_URL}/{uuid.uuid4()}")
-#     assert r.status_code == 401
+async def test_delete_category_unauthorized(client: AsyncClient) -> None:
+    """Trả về 401 nếu không có token."""
+    r = await client.delete(f"{BASE_URL}/{uuid.uuid4()}")
+    assert r.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Security / behavior edge cases
+# ---------------------------------------------------------------------------
+
+
+async def test_update_category_other_user_category_exists_returns_403_not_404(
+    client: AsyncClient,
+    normal_user_token_headers: dict[str, str],
+    db: AsyncSession,
+) -> None:
+    """
+    PATCH dùng session.get() không filter theo user_id — nếu category tồn tại
+    nhưng thuộc user khác thì phải trả 403, không phải 404.
+    Đảm bảo route không leak thông tin sự tồn tại của resource.
+    """
+    other_user = await create_random_user(db)
+    category = await create_random_category(db=db, user=other_user)
+
+    r = await client.patch(
+        f"{BASE_URL}/{category.id}",
+        headers=normal_user_token_headers,
+        json={"name": random_lower_string()},
+    )
+    # Route fetch category trước rồi mới check permission
+    # → 404 nếu không tồn tại, 403 nếu tồn tại nhưng không có quyền
+    assert r.status_code == 403
+
+
+async def test_delete_category_other_user_category_exists_returns_403_not_404(
+    client: AsyncClient,
+    normal_user_token_headers: dict[str, str],
+    db: AsyncSession,
+) -> None:
+    """
+    DELETE dùng session.get() không filter theo user_id — tương tự PATCH,
+    category tồn tại nhưng thuộc user khác phải trả 403, không phải 404.
+    """
+    other_user = await create_random_user(db)
+    category = await create_random_category(db=db, user=other_user)
+
+    r = await client.delete(
+        f"{BASE_URL}/{category.id}",
+        headers=normal_user_token_headers,
+    )
+    assert r.status_code == 403
+
+
+async def test_create_category_belongs_to_current_user(
+    client: AsyncClient,
+    normal_user_token_headers: dict[str, str],
+    db: AsyncSession,
+) -> None:
+    """Category được tạo phải thuộc về đúng current user, không phải user khác."""
+    user = await crud.get_user_by_email(session=db, email=settings.EMAIL_TEST_USER)
+    assert user is not None
+    data = {"name": random_lower_string(), "type": "income"}
+
+    r = await client.post(BASE_URL + "/", headers=normal_user_token_headers, json=data)
+
+    assert r.status_code == 201
+    assert r.json()["user_id"] == str(user.id)
+
+
+async def test_delete_category_verify_removed(
+    client: AsyncClient,
+    normal_user_token_headers: dict[str, str],
+    db: AsyncSession,
+) -> None:
+    """Sau khi xóa thành công, GET lại phải trả 404."""
+    user = await crud.get_user_by_email(session=db, email=settings.EMAIL_TEST_USER)
+    assert user is not None
+    category = await create_random_category(db=db, user=user)
+
+    r = await client.delete(
+        f"{BASE_URL}/{category.id}", headers=normal_user_token_headers
+    )
+    assert r.status_code == 204
+
+    r = await client.get(f"{BASE_URL}/{category.id}", headers=normal_user_token_headers)
+    assert r.status_code == 404
+
+
+async def test_update_category_partial_fields_not_overwrite_others(
+    client: AsyncClient,
+    normal_user_token_headers: dict[str, str],
+    db: AsyncSession,
+) -> None:
+    """Partial update chỉ thay đổi field được gửi, các field khác giữ nguyên."""
+    user = await crud.get_user_by_email(session=db, email=settings.EMAIL_TEST_USER)
+    assert user is not None
+    category = await create_random_category(db=db, user=user, type=CategoryType.income)
+    original_type = category.type
+    original_icon = category.icon
+
+    r = await client.patch(
+        f"{BASE_URL}/{category.id}",
+        headers=normal_user_token_headers,
+        json={"name": random_lower_string()},
+    )
+
+    assert r.status_code == 200
+    updated = r.json()
+    assert updated["type"] == original_type
+    assert updated["icon"] == original_icon
+
+
+async def test_list_categories_superuser_sees_all_users_categories(
+    client: AsyncClient,
+    superuser_token_headers: dict[str, str],
+    db: AsyncSession,
+) -> None:
+    """Superuser nhận về categories của tất cả users."""
+    user1 = await create_random_user(db)
+    user2 = await create_random_user(db)
+    cat1 = await create_random_category(db=db, user=user1)
+    cat2 = await create_random_category(db=db, user=user2)
+
+    r = await client.get(BASE_URL + "/", headers=superuser_token_headers)
+
+    assert r.status_code == 200
+    ids = [item["id"] for item in r.json()["items"]]
+    assert str(cat1.id) in ids
+    assert str(cat2.id) in ids
