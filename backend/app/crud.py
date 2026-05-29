@@ -244,7 +244,7 @@ async def update_transaction(
 
     session.add(tx)
     await session.commit()
-    await session.refresh(tx, attribute_names=["category"])
+    await session.refresh(tx)
 
     return tx
 

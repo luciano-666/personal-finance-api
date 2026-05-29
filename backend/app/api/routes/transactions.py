@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import uuid
 from typing import Any
+from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from pydantic import ValidationError
 
 from app.api.deps import CurrentUser, SessionDep
 from app import crud
+from app.models import TransactionType
 from app.schemas import (
     TransactionCreate,
     TransactionFilter,
@@ -16,6 +19,37 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
+
+# ---------------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------------
+
+
+async def get_transaction_filters(
+    category_id: uuid.UUID | None = None,
+    type: TransactionType | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+) -> TransactionFilter:
+    try:
+        return TransactionFilter(
+            category_id=category_id,
+            type=type,
+            date_from=date_from,
+            date_to=date_to,
+            page=page,
+            page_size=page_size,
+        )
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=[
+                {"loc": list(err["loc"]), "msg": err["msg"], "type": err["type"]}
+                for err in e.errors()
+            ],
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -39,6 +73,11 @@ async def create_transaction(
     tx = await crud.create_transaction(
         session=session, user_id=current_user.id, tx_in=tx_in
     )
+    if not tx:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid category or type mismatch",
+        )
     return tx
 
 
@@ -47,7 +86,7 @@ async def list_transactions(
     *,
     session: SessionDep,
     current_user: CurrentUser,
-    filters: TransactionFilter = Depends(),
+    filters: TransactionFilter = Depends(get_transaction_filters),
 ) -> Any:
     """
     List the current user's transactions with optional filters.
@@ -108,9 +147,15 @@ async def update_transaction(
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
-    return await crud.update_transaction(
+    updated = await crud.update_transaction(
         session=session, tx=tx, tx_in=tx_in, user_id=current_user.id
     )
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid category or type mismatch",
+        )
+    return updated
 
 
 @router.delete("/{transaction_id}", status_code=204)
