@@ -11,7 +11,6 @@ from app.schemas import (
 )
 from app.api.deps import SessionDep, CurrentUser
 from app import crud
-from app.models import Budget
 
 router = APIRouter(prefix="/budgets", tags=["budgets"])
 
@@ -68,16 +67,16 @@ async def update_budget(
     id: uuid.UUID,
 ) -> Any:
     """Update a budget"""
-    budget = await crud.get_budget(
-        session=session, budget_id=id, user_id=current_user.id
-    )
+    if current_user.is_superuser:
+        budget = await crud.get_budget_by_id(session=session, budget_id=id)
+    else:
+        budget = await crud.get_budget(
+            session=session, budget_id=id, user_id=current_user.id
+        )
+
     if not budget:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Budget not found"
-        )
-    if not current_user.is_superuser and (budget.user_id != current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
         )
     return await crud.update_budget(session=session, budget=budget, budget_in=budget_in)
 
@@ -87,15 +86,15 @@ async def delete_budget(
     session: SessionDep, current_user: CurrentUser, id: uuid.UUID
 ) -> None:
     """Delete a budget"""
-    budget = await crud.get_budget(
-        session=session, budget_id=id, user_id=current_user.id
-    )
+    if current_user.is_superuser:
+        budget = await crud.get_budget_by_id(session=session, budget_id=id)
+    else:
+        budget = await crud.get_budget(
+            session=session, budget_id=id, user_id=current_user.id
+        )
+
     if not budget:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Budget not found"
-        )
-    if not current_user.is_superuser and (budget.user_id != current_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
         )
     await crud.delete_budget(session=session, budget=budget)

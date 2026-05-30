@@ -270,7 +270,7 @@ class BudgetFilter(BaseModel):
         default=None, gt=0, max_digits=15, decimal_places=2
     )
     month: int | None = Field(default=None, ge=1, le=12)
-    year: int | None
+    year: int | None = None
 
 
 # ---------------------------------------------------------------------------

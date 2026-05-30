@@ -332,6 +332,18 @@ async def get_budget(
     return (await session.execute(statement)).scalar_one_or_none()
 
 
+async def get_budget_by_id(
+    *, session: AsyncSession, budget_id: uuid.UUID
+) -> Optional[Budget]:
+    """Fetch by id only — for use in routes that already verified ownership."""
+    statement = (
+        select(Budget)
+        .where(Budget.id == budget_id)
+        .options(selectinload(Budget.category))
+    )
+    return (await session.execute(statement)).scalar_one_or_none()
+
+
 async def list_budgets(
     *, session: AsyncSession, user: User, filters: BudgetFilter
 ) -> list[Budget]:
