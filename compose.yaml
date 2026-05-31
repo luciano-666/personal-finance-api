@@ -1,6 +1,5 @@
-# Use postgres/example user/password credentials
-
 services:
+
   db:
     image: postgres:18
     restart: always
@@ -14,32 +13,83 @@ services:
       - app-db-data:/var/lib/postgresql/data/pgdata
     env_file:
       - .env
-    ports:
-      - 5432:5432
     environment:
       - PGDATA=/var/lib/postgresql/data/pgdata
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD?Variable not set}
       - POSTGRES_USER=${POSTGRES_USER?Variable not set}
       - POSTGRES_DB=${POSTGRES_DB?Variable not set}
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:latest
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      retries: 5
+      start_period: 10s
+      timeout: 5s
+    environment:
+      - REDIS_ARGS=--requirepass ${REDIS_PASSWORD?Variable not set} --appendonly yes
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
 
   adminer:
     image: adminer
     restart: always
     ports:
-      - 8080:8080
+      - "8080:8080"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
-  redis:
-    image: redis:latest
-    container_name: my-redis
-    restart: always
-    ports:
-      - 6379:6379
+  prestart:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+      redis:
+        condition: service_healthy
+        restart: true
+    command: bash scripts/prestart.sh
+    env_file:
+      - .env
     environment:
-      - REDIS_ARGS=--requirepass ${REDIS_PASSWORD?Variable not set} --appendonly yes
-    volumes:
-      - redis-data:/data
+      - POSTGRES_SERVER=db
+      - REDIS_HOST=redis
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+      redis:
+        condition: service_healthy
+        restart: true
+      prestart:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_SERVER=db
+      - REDIS_HOST=redis
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/utils/health-check/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   app-db-data:
